@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vidyalaya · Study Platform</title>
+  <meta name="description" content="Vidyalaya — your personal study management platform." />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Tailwind via CDN — no build step needed -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ink: { DEFAULT: '#141B2E', light: '#1F2A44', soft: '#2C3A5C' },
+            paper: { DEFAULT: '#FAF6EE', dim: '#F1EADA', line: '#E4D9C0' },
+            marigold: { DEFAULT: '#E3A008', light: '#F4C24B', dark: '#B87D06' },
+            sage: { DEFAULT: '#5C8374', light: '#7FA695', dark: '#43665A' },
+            rust: { DEFAULT: '#B23A2E', light: '#D25A4C' },
+          },
+          fontFamily: {
+            display: ['"Fraunces"', 'serif'],
+            body: ['"Inter"', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Lucide icons via CDN — used throughout as window.lucide.createIcons() -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Identity Services — used for silent Drive access-token refresh -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="bg-paper dark:bg-ink text-ink dark:text-paper font-body antialiased transition-colors">
+  <div id="app"></div>
+
+  <!-- app.js is a module so it can use import/export — no bundler required,
+       modern browsers run ES modules natively. -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

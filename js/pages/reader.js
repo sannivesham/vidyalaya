@@ -27,6 +27,7 @@ export function render(params, routeParam) {
         <p class="text-xs text-ink/40 dark:text-paper/40">Use the viewer's own controls below to navigate pages and zoom.</p>
         <div class="flex items-center gap-1">
           <button id="bookmark-page" class="p-1.5 rounded-md hover:bg-ink/5 dark:hover:bg-paper/10" title="Bookmark this file"><i data-lucide="bookmark" style="width:15px;height:15px"></i></button>
+          <button id="fullscreen-toggle" class="p-1.5 rounded-md hover:bg-ink/5 dark:hover:bg-paper/10" title="Fullscreen"><i data-lucide="maximize" style="width:15px;height:15px"></i></button>
           <button id="download-file" class="p-1.5 rounded-md hover:bg-ink/5 dark:hover:bg-paper/10" title="Download"><i data-lucide="download" style="width:15px;height:15px"></i></button>
           <button id="mark-complete" class="btn ${file.status === 'Completed' ? 'btn-secondary' : 'btn-primary'} ml-1" style="padding:0.3rem 0.75rem;font-size:0.75rem;">
             <i data-lucide="check-circle-2" style="width:14px;height:14px"></i> ${file.status === 'Completed' ? 'Completed' : 'Mark Complete'}
@@ -134,6 +135,22 @@ export function mount(params, routeParam) {
     await addBookmark({ id: uid(), fileId: file.id, createdAt: new Date().toISOString() })
     showToast('Bookmarked', 'success')
     if (tab === 'bookmarks') renderTabContent(file.id)
+  })
+
+  const fsBtn = document.getElementById('fullscreen-toggle')
+  fsBtn.addEventListener('click', () => {
+    const viewport = document.getElementById('reader-viewport')
+    if (!document.fullscreenElement) {
+      viewport.requestFullscreen?.()
+    } else {
+      document.exitFullscreen?.()
+    }
+  })
+  document.addEventListener('fullscreenchange', () => {
+    const isFs = !!document.fullscreenElement
+    const icon = fsBtn.querySelector('i')
+    if (icon) { icon.setAttribute('data-lucide', isFs ? 'minimize' : 'maximize'); window.lucide?.createIcons() }
+    document.getElementById('reader-viewport')?.classList.toggle('bg-black', isFs)
   })
 
   document.getElementById('download-file').addEventListener('click', async () => {

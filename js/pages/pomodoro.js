@@ -1,5 +1,6 @@
 import { state, recordStudyMinutes, persist } from '../store.js'
 import { formatDuration } from '../utils.js'
+import { showWidget, hideWidget, updateWidget } from '../pomodoro-widget.js'
 
 const FOCUS_MIN = 25
 const SHORT_BREAK_MIN = 5
@@ -87,6 +88,7 @@ function updateDisplay() {
   const s = String(secondsLeft % 60).padStart(2, '0')
   const displayEl = document.getElementById('timer-display')
   if (displayEl) displayEl.textContent = `${m}:${s}`
+  updateWidget(phase, secondsLeft)
 
   const total = phaseTotalSeconds()
   const circumference = 2 * Math.PI * 100
@@ -165,6 +167,7 @@ function finishSession() {
   sessionElapsedMinutes = 0
   cyclesCompleted = 0
   phase = 'focus'
+  hideWidget()
 }
 
 function refreshStatCards() {
@@ -187,6 +190,7 @@ export function mount() {
   if (sessionActive) {
     updateDisplay()
     toggleButtons()
+    showWidget()
   }
 
   document.getElementById('start-session-btn')?.addEventListener('click', () => {
@@ -205,12 +209,14 @@ export function mount() {
     running = true
     toggleButtons()
     intervalId = setInterval(tick, 1000)
+    showWidget()
   })
 
   document.getElementById('start-btn')?.addEventListener('click', () => {
     running = true
     toggleButtons()
     intervalId = setInterval(tick, 1000)
+    showWidget()
   })
   document.getElementById('pause-btn')?.addEventListener('click', () => {
     running = false

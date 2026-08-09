@@ -1,5 +1,5 @@
 import { state, persist } from '../store.js'
-import { uid, PRIORITIES, TASK_CATEGORIES, escapeHtml } from '../utils.js'
+import { uid, PRIORITIES, TASK_CATEGORIES, TASK_SUBCATEGORIES, escapeHtml } from '../utils.js'
 import { emptyState } from './dashboard.js'
 
 let filter = 'pending'
@@ -46,8 +46,8 @@ function renderList() {
         </button>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium truncate ${t.completed ? 'line-through text-ink/40 dark:text-paper/40' : ''}">${escapeHtml(t.title)}</p>
-          <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-xs text-ink/50 dark:text-paper/50">${t.category}</span>
+          <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span class="text-xs text-ink/50 dark:text-paper/50">${escapeHtml(t.category)}${t.subCategory ? ' &rsaquo; ' + escapeHtml(t.subCategory) : ''}</span>
             ${t.dueDate ? `<span class="text-xs text-ink/50 dark:text-paper/50">&middot; Due ${new Date(t.dueDate).toLocaleDateString()}</span>` : ''}
           </div>
         </div>
@@ -68,10 +68,17 @@ function renderList() {
   }))
 }
 
+function subcategoryOptions(category) {
+  const subs = TASK_SUBCATEGORIES[category] || []
+  return subs.map((s) => `<option>${s}</option>`).join('')
+}
+
 function renderForm(open) {
   const root = document.getElementById('task-modal-root')
   if (!root) return
   if (!open) { root.innerHTML = ''; return }
+
+  const defaultCategory = TASK_CATEGORIES[0]
 
   root.innerHTML = `
     <div class="modal-backdrop" id="task-backdrop">
@@ -86,11 +93,16 @@ function renderForm(open) {
             <div><label class="block text-xs font-medium mb-1.5">Category</label>
               <select id="task-category" class="input">${TASK_CATEGORIES.map((c) => `<option>${c}</option>`).join('')}</select>
             </div>
+            <div><label class="block text-xs font-medium mb-1.5">Subcategory</label>
+              <select id="task-subcategory" class="input">${subcategoryOptions(defaultCategory)}</select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
             <div><label class="block text-xs font-medium mb-1.5">Priority</label>
               <select id="task-priority" class="input">${PRIORITIES.map((p) => `<option>${p}</option>`).join('')}</select>
             </div>
+            <div><label class="block text-xs font-medium mb-1.5">Due date</label><input type="date" id="task-due" class="input" /></div>
           </div>
-          <div><label class="block text-xs font-medium mb-1.5">Due date</label><input type="date" id="task-due" class="input" /></div>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" id="cancel-task" class="btn btn-secondary">Cancel</button>
             <button type="submit" class="btn btn-primary">Add Task</button>
@@ -105,6 +117,10 @@ function renderForm(open) {
   document.getElementById('cancel-task').addEventListener('click', close)
   document.getElementById('task-backdrop').addEventListener('click', (e) => { if (e.target.id === 'task-backdrop') close() })
 
+  document.getElementById('task-category').addEventListener('change', (e) => {
+    document.getElementById('task-subcategory').innerHTML = subcategoryOptions(e.target.value)
+  })
+
   document.getElementById('task-form').addEventListener('submit', (e) => {
     e.preventDefault()
     const title = document.getElementById('task-title').value
@@ -112,6 +128,7 @@ function renderForm(open) {
     state.tasks.unshift({
       id: uid(), title, completed: false, createdAt: new Date().toISOString(),
       category: document.getElementById('task-category').value,
+      subCategory: document.getElementById('task-subcategory').value,
       priority: document.getElementById('task-priority').value,
       dueDate: document.getElementById('task-due').value,
     })

@@ -52,4 +52,10 @@ export function escapeHtml(str = '') {
 export const CATEGORIES = ['ECE', 'Programming', 'AI & ML', 'College Subjects', 'ISRO', 'GATE', 'Notes', 'Placements', 'Personal']
 export const PRIORITIES = ['High', 'Medium', 'Low']
 export const TASK_CATEGORIES = ['Study', 'Personal', 'Project', 'Assignment']
+export const TASK_SUBCATEGORIES = {
+  Study: ['Reading', 'Revision', 'Practice Problems', 'Notes Making', 'Exam Prep'],
+  Personal: ['Health', 'Errands', 'Family', 'Finance', 'Other'],
+  Project: ['Research', 'Development', 'Documentation', 'Testing', 'Presentation'],
+  Assignment: ['Homework', 'Lab Report', 'Group Work', 'Submission'],
+}
 export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

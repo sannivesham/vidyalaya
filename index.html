@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vidyalaya · Study Platform</title>
-  <meta name="description" content="Vidyalaya — your personal study management platform." />
+  <meta name="description" content="Vidyalaya — your personal study management platform with subject-wise folders, document reader, and 25-5 pomodoro timer." />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,8 +43,8 @@
   <!-- Lucide icons via CDN — used throughout as window.lucide.createIcons() -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
-  <!-- Google Identity Services — used for silent Drive access-token refresh -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- PPTX in-browser renderer -->
+  <script src="https://cdn.jsdelivr.net/npm/pptx-preview@1.0.7/dist/pptx-preview.umd.min.js"></script>
 </head>
 <body class="bg-paper dark:bg-ink text-ink dark:text-paper font-body antialiased transition-colors">
   <div id="app"></div>

@@ -1,43 +1,77 @@
-# Vidyalaya (static version — no build tools required)
+# Vidyalaya (Static Web Edition)
 
-This is a plain HTML/CSS/JavaScript version of Vidyalaya. There is no build
-step, no npm, no node_modules — you can drop this folder straight into a
-GitHub repo and it will work as-is.
+Vidyalaya is a student study management platform featuring subject-wise folders, an in-browser document reader for PDFs and PowerPoint presentations, an integrated 25-5 Pomodoro study timer, timetable planning, tasks, and free Telegram cloud storage.
 
-## How to put it live on GitHub Pages
+There is **no build step, no npm build, no node_modules required** — it runs directly in the browser using modern ES modules, Tailwind CDN, and Lucide icons. You can deploy it to **GitHub Pages** by pushing to `main`.
 
-1. Create (or reuse) a repo, e.g. `vidyalaya`.
-2. Drag every file and folder from inside this `vidyalaya-static` folder
-   into the repo's root on GitHub (index.html, css/, js/, favicon.svg —
-   don't upload the outer `vidyalaya-static` folder itself, just its
-   contents) and commit straight to `main`.
-3. Go to Settings → Pages → Source → **Deploy from a branch** → choose
-   `main` and `/ (root)` → Save.
-4. Wait about a minute, then visit `https://<your-username>.github.io/<repo-name>/`.
+---
 
-That's it — no Actions, no build, no `dist` folder. Every time you want to
-update the site, just edit files and re-upload/commit to `main`.
+## Key Features
 
-## What's inside
+1. **Subject-Wise Library Folders**:
+   - Create and organize subjects with custom icons, color accents, and semesters.
+   - Click into any subject folder to see all lecture notes, presentations, and reference materials.
+   - Upload files directly into the active subject folder or easily move files between subjects.
 
-- `index.html` — the single page shell. Loads Tailwind and Lucide icons from
-  a CDN (no install needed) plus your own `css/style.css` and `js/app.js`.
-- `css/style.css` — the notebook/index-card visual style.
-- `js/` — plain ES module JavaScript, organized by page (dashboard, library,
-  reader, timetable, calendar, tasks, pomodoro, analytics, achievements,
-  profile, settings). Browsers run these natively via
-  `<script type="module">` — no bundler required.
-- Routing is hash-based (`#/library`, `#/reader/<id>`, etc.), which is what
-  makes this work correctly on GitHub Pages without any server config.
+2. **In-Browser Document Reader (PDF & PPTX)**:
+   - Read PDFs directly in the browser with full zoom, fit-to-page, and fullscreen controls.
+   - Preview PowerPoint presentations (`.pptx`) slide-by-slide inside the website without external software or Google Drive login.
+   - View images and take persistent document notes and bookmarks as you study.
 
-## Data storage
+3. **Integrated 25-5 Pomodoro Study Timer**:
+   - Built directly into the reader header so you never lose focus.
+   - 25-minute Focus Session followed by a 5-minute Rest Break.
+   - Visual progress countdown, start/pause/reset controls, and optional Web Audio chime.
+   - Automatically tracks your focus minutes, updates your streak, and increments daily goals.
 
-Everything is stored locally in the visitor's browser:
+4. **Telegram Cloud Storage**:
+   - Store and sync your study materials for free via the Telegram Bot API.
+   - Enter your Bot Token (from `@BotFather`) and Channel/Group Chat ID in **Settings**.
+   - Built-in connection tester to verify bot and channel connectivity.
+   - Files are also cached locally in browser **IndexedDB** for instant offline opening.
 
-- **localStorage** — tasks, timetable, streaks, goals, achievements, profile
-- **IndexedDB** — uploaded file blobs, notes, bookmarks
+---
 
-There's no backend, so data doesn't sync between devices or browsers. If you
-want real accounts and cross-device sync later, that's a bigger step (e.g.
-adding Firebase, like your Sannivesham project) — a separate project from
-this static version.
+## Quick Start (Run Locally)
+
+You can run Vidyalaya locally using Node's built-in HTTP server:
+
+```bash
+node serve.js
+```
+
+Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+Or use any static web server (VS Code Live Server, Python, GitHub Pages, etc.).
+
+---
+
+## Deploying to GitHub Pages
+
+1. Push this repository to GitHub on the `main` branch.
+2. In your repo on GitHub: Go to **Settings** &rarr; **Pages**.
+3. Under **Build and deployment**:
+   - Source: **Deploy from a branch**
+   - Branch: `main` / `(root)`
+   - Click **Save**.
+4. In ~60 seconds, your site is live at `https://<your-username>.github.io/vidyalaya/`!
+
+---
+
+## Telegram Cloud Storage Setup
+
+1. Open Telegram and search for `@BotFather`.
+2. Send `/newbot`, name your bot (e.g., `MyStudyBot`), and copy the **Bot Token**.
+3. Create a Telegram Channel or Group (e.g. `My Study Vault`).
+4. Add your bot as an **Administrator** to that channel.
+5. In Vidyalaya, go to **Settings &rarr; Telegram Cloud Storage**:
+   - Paste your **Bot Token**.
+   - Paste your **Chat ID** or channel username (e.g. `@my_study_vault` or `-100xxxxxxxxxx`).
+   - Click **Test Connection** &rarr; **Save Telegram Settings**.
+6. When you upload files in the Library, they will be sent straight to your Telegram channel and available from any browser!
+
+---
+
+## License
+
+MIT

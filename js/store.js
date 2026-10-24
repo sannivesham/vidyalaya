@@ -6,8 +6,15 @@ import { showToast } from './toast.js'
 const LOCAL_KEY_PREFIX = 'vidyalaya-cache-'
 const GUEST_KEY = 'guest'
 
+export const DEFAULT_FOLDERS = [
+  { id: 'f-maths', name: 'Engineering Mathematics', semester: 'Semester 1', color: '#E3A008', icon: 'calculator', createdAt: new Date().toISOString() },
+  { id: 'f-dsa', name: 'Data Structures & Algorithms', semester: 'Semester 3', color: '#5C8374', icon: 'binary', createdAt: new Date().toISOString() },
+  { id: 'f-ece', name: 'Digital Electronics', semester: 'Semester 3', color: '#B23A2E', icon: 'cpu', createdAt: new Date().toISOString() },
+]
+
 function defaultState() {
   return {
+    folders: [...DEFAULT_FOLDERS],
     tasks: [],
     timetable: [],
     files: [],
@@ -67,23 +74,21 @@ function applyDailyResets() {
 }
 
 /**
- * Loads local-only data for someone who hasn't signed in. Called once at
- * app boot, always, so the app is usable immediately with no login wall.
+ * Loads local-only data for someone who hasn't signed in.
  */
 export function initGuestState() {
   currentUid = null
   const cached = loadLocalCache(GUEST_KEY)
   Object.assign(state, defaultState(), cached || {})
+  if (!state.folders || !state.folders.length) {
+    state.folders = [...DEFAULT_FOLDERS]
+  }
   applyDailyResets()
   ready = true
 }
 
 /**
- * Called when a user signs in (either automatically on page load, if a
- * session persisted, or via the Profile page). If they already have cloud
- * data, it replaces whatever's showing (so other devices' data wins). If
- * this is their first time signing in, whatever was collected locally as
- * a guest is carried up and becomes their cloud data.
+ * Called when a user signs in.
  */
 export async function initState(user) {
   currentUid = user.uid
@@ -97,8 +102,6 @@ export async function initState(user) {
     if (snap.exists()) {
       Object.assign(state, defaultState(), snap.data())
     } else {
-      // first sign-in on this account — keep whatever's already in `state`
-      // (e.g. guest activity from before login) and push it up as the seed
       state.profile.name = user.displayName || state.profile.name || 'Student'
       state.profile.email = user.email || ''
       state.profile.photoURL = user.photoURL || ''
@@ -107,9 +110,11 @@ export async function initState(user) {
     }
   } catch (err) {
     console.warn('Could not reach Firestore, using local cache:', err)
-    showToast('Could not reach the cloud — check your Firestore rules or connection.', 'error')
   }
 
+  if (!state.folders || !state.folders.length) {
+    state.folders = [...DEFAULT_FOLDERS]
+  }
   applyDailyResets()
   ready = true
   saveLocalCache()
@@ -124,22 +129,20 @@ export function isSignedIn() {
 }
 
 /**
- * Persists state to a local cache immediately. If signed in, also syncs to
- * Firestore on a short debounce so rapid successive edits don't spam writes.
+ * Persists state to local cache immediately and debounces cloud sync if logged in.
  */
 export function persist() {
   saveLocalCache()
-  if (!currentUid) return // guest mode — local only, nothing to sync
+  if (!currentUid) return
 
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(async () => {
     try {
       await setDoc(doc(db, 'vidyalayaUsers', currentUid), state)
     } catch (err) {
-      console.warn('Cloud sync failed, will retry on next change:', err)
-      showToast('Sync to the cloud failed — this device is up to date, but others may not be yet.', 'error')
+      console.warn('Cloud sync failed:', err)
     }
-  }, 600)
+  }, 800)
 }
 
 export function recordStudyMinutes(minutes) {
@@ -162,6 +165,70 @@ export function recordStudyMinutes(minutes) {
   persist()
 }
 
+// ---- Folders / Subjects Management ----
+
+export function addFolder({ name, semester = '', color = '#E3A008', icon = 'folder', description = '' }) {
+  const folder = {
+    id: 'f-' + uidLocal(),
+    name: name.trim(),
+    semester: semester.trim(),
+    color,
+    icon,
+    description: description.trim(),
+    createdAt: new Date().toISOString(),
+  }
+  if (!state.folders) state.folders = []
+  state.folders.push(folder)
+  persist()
+  return folder
+}
+
+export function updateFolder(folderId, patch) {
+  const folder = state.folders.find((f) => f.id === folderId)
+  if (folder) {
+    Object.assign(folder, patch)
+    // If folder name changed, update corresponding subject name on all its files
+    if (patch.name) {
+      state.files.forEach((f) => {
+        if (f.folderId === folderId) f.subject = patch.name
+      })
+    }
+    persist()
+  }
+  return folder
+}
+
+export function deleteFolder(folderId, deleteFiles = false) {
+  const idx = state.folders.findIndex((f) => f.id === folderId)
+  if (idx !== -1) {
+    state.folders.splice(idx, 1)
+    if (deleteFiles) {
+      // Remove all files inside this folder
+      const filesToDelete = state.files.filter((f) => f.folderId === folderId)
+      filesToDelete.forEach((f) => deleteFileBlob(f.id))
+      state.files = state.files.filter((f) => f.folderId !== folderId)
+    } else {
+      // Unlink files so they remain in library as unfiled
+      state.files.forEach((f) => {
+        if (f.folderId === folderId) {
+          f.folderId = null
+        }
+      })
+    }
+    persist()
+  }
+}
+
+export function getFolder(folderId) {
+  return (state.folders || []).find((f) => f.id === folderId) || null
+}
+
+export function getFilesForFolder(folderId) {
+  return (state.files || []).filter((f) => f.folderId === folderId)
+}
+
+// ---- File Management ----
+
 export function addFile(meta) {
   const file = {
     id: uidLocal(),
@@ -169,6 +236,7 @@ export function addFile(meta) {
     uploadedAt: new Date().toISOString(),
     favorite: false,
     readProgress: 0,
+    folderId: meta.folderId || null,
     notes: [],
     bookmarks: [],
     ...meta,
@@ -184,6 +252,15 @@ export function updateFile(fileId, patch) {
   if (f) Object.assign(f, patch)
   persist()
   return f
+}
+
+export async function removeFile(fileId) {
+  const idx = state.files.findIndex((x) => x.id === fileId)
+  if (idx !== -1) {
+    state.files.splice(idx, 1)
+    await deleteFileBlob(fileId)
+    persist()
+  }
 }
 
 export function markFileStatus(fileId, status) {
@@ -207,7 +284,78 @@ function uidLocal() {
   return crypto.randomUUID()
 }
 
-// ---- Notes & bookmarks (embedded per-file, synced as part of the user doc) ----
+// ---- IndexedDB: local binary blobs storage ----
+const DB_NAME = 'vidyalaya-storage'
+let dbPromise = null
+
+function getDB() {
+  if (dbPromise) return dbPromise
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 2)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains('fileBlobs')) {
+        db.createObjectStore('fileBlobs')
+      }
+      if (!db.objectStoreNames.contains('notes')) {
+        const s = db.createObjectStore('notes', { keyPath: 'id' })
+        s.createIndex('fileId', 'fileId')
+      }
+      if (!db.objectStoreNames.contains('bookmarks')) {
+        const s = db.createObjectStore('bookmarks', { keyPath: 'id' })
+        s.createIndex('fileId', 'fileId')
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+  return dbPromise
+}
+
+export async function saveFileBlob(fileId, blob) {
+  try {
+    const db = await getDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('fileBlobs', 'readwrite')
+      tx.objectStore('fileBlobs').put(blob, fileId)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } catch (err) {
+    console.warn('IndexedDB save failed:', err)
+  }
+}
+
+export async function getFileBlob(fileId) {
+  try {
+    const db = await getDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('fileBlobs', 'readonly')
+      const req = tx.objectStore('fileBlobs').get(fileId)
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => reject(req.error)
+    })
+  } catch (err) {
+    console.warn('IndexedDB get failed:', err)
+    return null
+  }
+}
+
+export async function deleteFileBlob(fileId) {
+  try {
+    const db = await getDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('fileBlobs', 'readwrite')
+      tx.objectStore('fileBlobs').delete(fileId)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  } catch (err) {
+    console.warn('IndexedDB delete failed:', err)
+  }
+}
+
+// ---- Notes & Bookmarks ----
 
 export async function addNote(note) {
   const f = state.files.find((x) => x.id === note.fileId)

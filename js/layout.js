@@ -56,9 +56,9 @@ export function renderShell(currentHash) {
             <button id="theme-toggle" class="p-2 rounded-lg hover:bg-ink/5 dark:hover:bg-paper/10" aria-label="Toggle theme">
               ${icon('moon')}
             </button>
-            <a href="#/profile" class="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-paper-line dark:border-ink-soft hover:bg-ink/5 dark:hover:bg-paper/10 text-xs" aria-label="Profile">
+            <a href="#/profile" class="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-paper-line dark:border-ink-soft hover:bg-ink/5 dark:hover:bg-paper/10 text-xs" aria-label="Profile" title="${tgUser ? 'Telegram Saved Messages Vault Active' : 'Connect Telegram'}">
               <span class="w-2 h-2 rounded-full ${tgUser ? 'bg-sage animate-pulse' : 'bg-marigold'}"></span>
-              <span class="font-medium">${tgUser ? (tgUser.first_name || tgUser.username || 'Telegram') : 'Login'}</span>
+              <span class="font-medium">${tgUser ? (tgUser.firstName || tgUser.first_name || tgUser.username || 'Telegram') : 'Login'}</span>
               <i data-lucide="send" style="width:12px;height:12px" class="text-blue-500"></i>
             </a>
           </div>

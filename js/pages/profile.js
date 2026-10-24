@@ -1,52 +1,154 @@
 import { state, BADGE_DEFS, persist } from '../store.js'
 import { formatDuration, escapeHtml } from '../utils.js'
-import { getTelegramUser, setTelegramUser, isTelegramLoggedIn, testTelegramConnection } from '../telegram-store.js'
+import { getTelegramUser, setTelegramUser } from '../telegram-store.js'
+import {
+  sendTelegramOtp,
+  verifyTelegramOtp,
+  verifyTelegram2faPassword,
+  signOutTelegramUser,
+  getApiCredentials,
+  saveApiCredentials,
+  isTelegramUserLoggedIn,
+} from '../telegram-mtproto.js'
 import { showToast } from '../toast.js'
 
 function renderTelegramLoginPrompt() {
+  const creds = getApiCredentials()
+
   return `
-    <div class="max-w-md mx-auto py-8">
+    <div class="max-w-md mx-auto py-6">
       <div class="card p-6 md:p-8 text-center shadow-md">
-        <!-- Telegram Logo -->
-        <div class="w-16 h-16 rounded-2xl bg-blue-500/15 text-blue-500 flex items-center justify-center mx-auto mb-4">
+        <!-- Telegram Paper Plane Icon -->
+        <div class="w-16 h-16 rounded-2xl bg-blue-500/15 text-blue-500 flex items-center justify-center mx-auto mb-4 shadow-sm">
           <i data-lucide="send" style="width:32px;height:32px"></i>
         </div>
 
         <h1 class="font-display text-2xl font-semibold mb-2">Log in with Telegram</h1>
         <p class="text-xs text-ink/60 dark:text-paper/60 mb-6 leading-relaxed">
-          Connect your Telegram account. Every document you upload in Vidyalaya is sent directly to your <strong>Telegram Saved Messages</strong> for free, permanent cloud storage.
+          Enter your phone number to receive a verification code directly in your Telegram app.
+          All uploaded study materials will be automatically saved in your <strong>Telegram Saved Messages</strong>.
         </p>
 
-        <!-- Quick Connect Form -->
-        <form id="tg-login-form" class="flex flex-col gap-3.5 text-left">
+        <!-- Feedback Messages -->
+        <div id="login-error-msg" class="hidden p-3 rounded-lg text-xs bg-rust/15 text-rust border border-rust/30 mb-4 text-left"></div>
+        <div id="login-info-msg" class="hidden p-3 rounded-lg text-xs bg-sage/15 text-sage-dark dark:text-sage-light border border-sage/30 mb-4 text-left"></div>
+
+        <!-- STEP 1: Phone Number -->
+        <div id="step-phone" class="flex flex-col gap-3.5 text-left">
           <div>
-            <label class="block text-xs font-semibold mb-1 flex items-center justify-between">
-              <span>Telegram Bot Token <span class="text-rust">*</span></span>
-              <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="text-[11px] text-marigold-dark hover:underline flex items-center gap-1 font-normal">
-                @BotFather <i data-lucide="external-link" style="width:11px;height:11px"></i>
-              </a>
+            <label class="block text-xs font-semibold mb-1">
+              Telegram Phone Number <span class="text-rust">*</span>
             </label>
-            <input id="login-bot-token" type="password" class="input font-mono text-xs" placeholder="e.g. 1234567890:ABCdefGHI..." required />
-            <p class="text-[10px] text-ink/40 dark:text-paper/40 mt-1">Get this once from @BotFather by sending <code>/newbot</code>.</p>
+            <input
+              id="login-phone"
+              type="tel"
+              class="input font-mono text-sm tracking-wide"
+              placeholder="+91 98765 43210"
+              autocomplete="tel"
+              required
+            />
+            <p class="text-[11px] text-ink/50 dark:text-paper/50 mt-1.5 leading-normal">
+              Include your country code (e.g. <code>+91</code> for India, <code>+1</code> for US). We will send the login code to your Telegram app.
+            </p>
+          </div>
+
+          <button type="button" id="btn-send-code" class="btn btn-primary w-full mt-2" style="padding:0.65rem 1rem;">
+            <i data-lucide="send" style="width:16px;height:16px"></i> Send Telegram Login Code
+          </button>
+        </div>
+
+        <!-- STEP 2: OTP Verification (Initially Hidden) -->
+        <div id="step-otp" class="hidden flex flex-col gap-3.5 text-left">
+          <div class="p-3 rounded-lg bg-paper-dim/60 dark:bg-ink-soft/40 border border-paper-line dark:border-ink-soft flex items-center justify-between">
+            <div class="text-xs">
+              <span class="text-ink/60 dark:text-paper/60">Code sent to:</span>
+              <span id="target-phone-display" class="font-mono font-bold ml-1"></span>
+            </div>
+            <button type="button" id="btn-back-phone" class="text-xs text-marigold-dark hover:underline font-medium">
+              Change
+            </button>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-center">
+              Enter 5-digit Telegram Code <span class="text-rust">*</span>
+            </label>
+            <input
+              id="login-otp"
+              type="text"
+              maxlength="8"
+              inputmode="numeric"
+              class="input font-mono text-center text-xl tracking-widest font-bold py-2.5"
+              placeholder="1 2 3 4 5"
+              autocomplete="one-time-code"
+            />
+            <p class="text-[11px] text-ink/50 dark:text-paper/50 mt-1.5 text-center">
+              Check your Telegram app (Saved Messages / Telegram Service chat) for the code.
+            </p>
+          </div>
+
+          <button type="button" id="btn-verify-otp" class="btn btn-primary w-full mt-2" style="padding:0.65rem 1rem;">
+            <i data-lucide="check-circle-2" style="width:16px;height:16px"></i> Verify & Log In
+          </button>
+
+          <button type="button" id="btn-resend-otp" class="btn btn-secondary w-full text-xs">
+            Resend Code
+          </button>
+        </div>
+
+        <!-- STEP 3: 2FA Password (If user has 2FA enabled) -->
+        <div id="step-2fa" class="hidden flex flex-col gap-3.5 text-left">
+          <div class="p-3 rounded-lg bg-marigold/10 border border-marigold/30 text-xs">
+            <p class="font-semibold text-marigold-dark">Two-Step Verification (2FA) Active</p>
+            <p class="text-ink/70 dark:text-paper/70 mt-0.5">Your Telegram account has cloud password protection enabled. Enter your password to complete login.</p>
           </div>
 
           <div>
             <label class="block text-xs font-semibold mb-1">
-              Your Telegram Username or Chat ID <span class="text-rust">*</span>
+              Telegram 2FA Password <span class="text-rust">*</span>
             </label>
-            <input id="login-chat-id" class="input font-mono text-xs" placeholder="e.g. @username or 123456789" required />
-            <p class="text-[10px] text-ink/40 dark:text-paper/40 mt-1">Your personal Telegram username or numeric ID where files will be sent.</p>
+            <input
+              id="login-2fa"
+              type="password"
+              class="input text-sm"
+              placeholder="Enter your 2FA password"
+              autocomplete="current-password"
+            />
           </div>
 
-          <div id="login-error-msg" class="hidden p-2.5 rounded-lg text-xs bg-rust/15 text-rust border border-rust/30"></div>
-
-          <button type="submit" id="tg-login-submit" class="btn btn-primary w-full mt-2" style="padding:0.6rem 1rem;">
-            <i data-lucide="log-in" style="width:16px;height:16px"></i> Connect & Log in with Telegram
+          <button type="button" id="btn-verify-2fa" class="btn btn-primary w-full mt-2" style="padding:0.65rem 1rem;">
+            <i data-lucide="lock" style="width:16px;height:16px"></i> Confirm Password & Log In
           </button>
-        </form>
+        </div>
 
+        <!-- Advanced: Custom App Credentials Accordion -->
+        <details class="mt-6 text-left text-xs text-ink/60 dark:text-paper/60 border border-paper-line dark:border-ink-soft rounded-lg p-3">
+          <summary class="cursor-pointer font-medium hover:text-ink dark:hover:text-paper select-none flex items-center justify-between">
+            <span>Advanced: Telegram App Credentials (Optional)</span>
+            <i data-lucide="sliders-horizontal" style="width:13px;height:13px"></i>
+          </summary>
+          <div class="mt-3 flex flex-col gap-2.5 pt-2 border-t border-paper-line dark:border-ink-soft">
+            <p class="text-[11px] leading-relaxed">
+              By default, Vidyalaya connects using official Telegram client credentials (API ID 2040). If you want to use your personal app credentials from <a href="https://my.telegram.org" target="_blank" rel="noopener" class="text-marigold-dark hover:underline">my.telegram.org</a>, configure them below:
+            </p>
+            <div>
+              <label class="block text-[11px] font-semibold mb-0.5">API ID</label>
+              <input id="custom-api-id" class="input font-mono text-xs py-1.5" placeholder="e.g. 2040" value="${creds.isCustom ? creds.apiId : ''}" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold mb-0.5">API Hash</label>
+              <input id="custom-api-hash" class="input font-mono text-xs py-1.5" placeholder="e.g. b18441a1ff607e10a989891a5462e627" value="${creds.isCustom ? creds.apiHash : ''}" />
+            </div>
+            <div class="flex items-center gap-2 mt-1">
+              <button type="button" id="btn-save-creds" class="btn btn-secondary text-[11px] py-1 px-2.5">Save Credentials</button>
+              ${creds.isCustom ? `<button type="button" id="btn-reset-creds" class="btn btn-secondary text-[11px] py-1 px-2.5 text-rust">Reset to Default</button>` : ''}
+            </div>
+          </div>
+        </details>
+
+        <!-- Footer Note -->
         <div class="mt-6 pt-5 border-t border-paper-line/50 dark:border-ink-soft/50 text-[11px] text-ink/40 dark:text-paper/40">
-          <p>No channels or groups needed &bull; Files go straight to your private Telegram chat.</p>
+          <p>No bots, channels, or public links &bull; Direct encrypted connection to your Telegram Saved Messages.</p>
         </div>
       </div>
     </div>
@@ -59,48 +161,59 @@ function renderTelegramAccount(user) {
   const completionPct = state.files.length ? Math.round((completedCount / state.files.length) * 100) : 0
   const circumference = 2 * Math.PI * 33
 
-  const displayName = user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : (state.profile.name || 'Student')
-  const username = user.username ? `@${user.username}` : (user.id ? `ID: ${user.id}` : '')
+  const firstName = user.firstName || user.first_name || 'Student'
+  const lastName = user.lastName || user.last_name || ''
+  const displayName = `${firstName} ${lastName}`.trim()
+  const username = user.username ? `@${user.username}` : (user.phone ? user.phone : (user.id ? `ID: ${user.id}` : ''))
+  const phone = user.phone || ''
 
   return `
     <div class="max-w-3xl mx-auto">
       <!-- Profile banner card -->
       <div class="card flex flex-col sm:flex-row items-center sm:items-start gap-5 mb-6 p-6">
         <div class="relative shrink-0">
-          ${user.photo_url
-            ? `<img src="${escapeHtml(user.photo_url)}" class="w-18 h-18 rounded-full border-2 border-marigold object-cover shadow" />`
-            : `<div class="w-16 h-16 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-xl">
-                 <i data-lucide="send" style="width:26px;height:26px"></i>
-               </div>`}
-          <span class="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-sage border-2 border-paper dark:border-ink" title="Connected"></span>
+          <div class="w-16 h-16 rounded-2xl bg-blue-500/20 text-blue-500 flex items-center justify-center font-bold text-xl shadow-sm">
+            <i data-lucide="send" style="width:28px;height:28px"></i>
+          </div>
+          <span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-sage border-2 border-paper dark:border-ink shadow" title="Connected"></span>
         </div>
 
         <div class="flex-1 text-center sm:text-left">
           <div class="flex items-center justify-center sm:justify-start gap-2 flex-wrap mb-1">
             <h1 class="font-display text-xl font-semibold">${escapeHtml(displayName)}</h1>
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-600 dark:text-blue-400">
-              Telegram
+              Telegram Connected
             </span>
           </div>
-          ${username ? `<p class="text-xs text-ink/60 dark:text-paper/60 font-mono mb-2">${escapeHtml(username)}</p>` : ''}
+
+          <div class="flex items-center justify-center sm:justify-start gap-3 text-xs text-ink/60 dark:text-paper/60 font-mono mb-2 flex-wrap">
+            ${username ? `<span>${escapeHtml(username)}</span>` : ''}
+            ${phone && phone !== username ? `<span>&bull; ${escapeHtml(phone)}</span>` : ''}
+          </div>
+
           <p class="text-xs text-sage font-medium flex items-center justify-center sm:justify-start gap-1">
             <i data-lucide="check-circle-2" style="width:13px;height:13px"></i>
-            Saved Messages Cloud Vault Active
+            Saved Messages Cloud Vault Active (chat: "me")
           </p>
         </div>
 
-        <button id="tg-logout-btn" class="btn btn-secondary text-xs shrink-0 self-center sm:self-start">
-          <i data-lucide="log-out" style="width:14px;height:14px"></i> Sign out
-        </button>
+        <div class="flex sm:flex-col items-center gap-2 shrink-0">
+          <a href="https://web.telegram.org/a/" target="_blank" rel="noopener" class="btn btn-secondary text-xs">
+            <i data-lucide="external-link" style="width:13px;height:13px"></i> Telegram
+          </a>
+          <button id="tg-logout-btn" class="btn btn-secondary text-xs hover:border-rust hover:text-rust">
+            <i data-lucide="log-out" style="width:13px;height:13px"></i> Sign out
+          </button>
+        </div>
       </div>
 
       <!-- Vault info notice -->
       <div class="p-4 rounded-xl border border-sage/40 bg-sage/10 text-xs mb-6 flex items-start gap-3">
         <i data-lucide="cloud-check" class="text-sage mt-0.5 shrink-0" style="width:18px;height:18px"></i>
-        <div>
+        <div class="leading-relaxed">
           <p class="font-semibold text-sage-dark dark:text-sage-light">Telegram Saved Messages Active</p>
-          <p class="text-ink/60 dark:text-paper/60 mt-0.5 leading-relaxed">
-            Every file you upload in any subject folder is instantly sent to your Telegram chat. You can access, forward, or download your materials anytime from your phone, laptop, or tablet.
+          <p class="text-ink/70 dark:text-paper/70 mt-0.5">
+            Every file you upload in any subject folder is instantly sent to your personal Telegram <strong>Saved Messages</strong> chat and cached locally for instant in-browser reading. Access your study materials anytime from your phone, laptop, or tablet.
           </p>
         </div>
       </div>
@@ -149,63 +262,223 @@ export function mount() {
   const tgUser = getTelegramUser()
 
   if (!tgUser) {
-    const form = document.getElementById('tg-login-form')
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const botToken = document.getElementById('login-bot-token').value.trim()
-      const chatId = document.getElementById('login-chat-id').value.trim()
-      const submitBtn = document.getElementById('tg-login-submit')
-      const errorMsg = document.getElementById('login-error-msg')
+    const stepPhone = document.getElementById('step-phone')
+    const stepOtp = document.getElementById('step-otp')
+    const step2fa = document.getElementById('step-2fa')
+    const phoneInput = document.getElementById('login-phone')
+    const otpInput = document.getElementById('login-otp')
+    const pass2faInput = document.getElementById('login-2fa')
+    const sendBtn = document.getElementById('btn-send-code')
+    const verifyOtpBtn = document.getElementById('btn-verify-otp')
+    const verify2faBtn = document.getElementById('btn-verify-2fa')
+    const resendBtn = document.getElementById('btn-resend-otp')
+    const backPhoneBtn = document.getElementById('btn-back-phone')
+    const targetPhoneDisplay = document.getElementById('target-phone-display')
+    const errorBox = document.getElementById('login-error-msg')
+    const infoBox = document.getElementById('login-info-msg')
 
-      if (!botToken || !chatId) {
-        showToast('Please fill in both Bot Token and Telegram Username/ID', 'error')
+    let activePhoneNumber = ''
+
+    function showError(msg) {
+      if (!errorBox) return
+      errorBox.textContent = msg
+      errorBox.classList.remove('hidden')
+      infoBox?.classList.add('hidden')
+    }
+
+    function showInfo(msg) {
+      if (!infoBox) return
+      infoBox.textContent = msg
+      infoBox.classList.remove('hidden')
+      errorBox?.classList.add('hidden')
+    }
+
+    function clearMessages() {
+      errorBox?.classList.add('hidden')
+      infoBox?.classList.add('hidden')
+    }
+
+    // Step 1: Send OTP
+    async function handleSendCode() {
+      const rawPhone = (phoneInput?.value || '').trim()
+      if (!rawPhone) {
+        showError('Please enter your phone number with country code (e.g. +91 9876543210)')
+        phoneInput?.focus()
         return
       }
 
-      submitBtn.disabled = true
-      submitBtn.innerHTML = `<span class="animate-pulse">Connecting to Telegram…</span>`
-      errorMsg.classList.add('hidden')
+      clearMessages()
+      sendBtn.disabled = true
+      sendBtn.innerHTML = `<span class="animate-pulse">Connecting to Telegram…</span>`
 
       try {
-        const result = await testTelegramConnection(botToken, chatId)
+        const result = await sendTelegramOtp(rawPhone)
+        activePhoneNumber = result.phoneNumber
 
-        // Clean username
-        const cleanUsername = chatId.startsWith('@') ? chatId.slice(1) : chatId
-        const userObj = {
-          id: chatId,
-          first_name: cleanUsername,
-          username: cleanUsername,
-          botToken,
-          connectedAt: new Date().toISOString(),
-        }
+        if (targetPhoneDisplay) targetPhoneDisplay.textContent = activePhoneNumber
+        stepPhone?.classList.add('hidden')
+        stepOtp?.classList.remove('hidden')
+        step2fa?.classList.add('hidden')
 
-        setTelegramUser(userObj)
-
-        // Update in-memory profile
-        state.profile.name = cleanUsername
-        state.profile.telegramUsername = cleanUsername
-        state.profile.telegramId = chatId
-        persist()
-
-        showToast(`Connected to Telegram! Uploads will go to Saved Messages.`, 'success')
-        location.hash = '#/profile'
-        location.reload()
+        showToast('Login code sent to your Telegram app!', 'success')
+        showInfo(`A verification code was sent to your Telegram app. Enter it below:`)
+        otpInput?.focus()
       } catch (err) {
-        console.error('Telegram login error:', err)
-        errorMsg.textContent = err.message || 'Could not connect. Please verify your Bot Token.'
-        errorMsg.classList.remove('hidden')
-        showToast('Login failed: ' + err.message, 'error')
+        console.error('Send OTP error:', err)
+        showError(err.message || 'Failed to send login code. Please check your phone number.')
+        showToast(err.message || 'Could not send code', 'error')
       } finally {
-        submitBtn.disabled = false
-        submitBtn.innerHTML = `<i data-lucide="log-in" style="width:16px;height:16px"></i> Connect & Log in with Telegram`
+        sendBtn.disabled = false
+        sendBtn.innerHTML = `<i data-lucide="send" style="width:16px;height:16px"></i> Send Telegram Login Code`
         window.lucide?.createIcons()
       }
+    }
+
+    sendBtn?.addEventListener('click', handleSendCode)
+    phoneInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleSendCode()
+      }
     })
+
+    // Step 2: Verify OTP
+    async function handleVerifyOtp() {
+      const code = (otpInput?.value || '').trim()
+      if (!code) {
+        showError('Please enter the OTP code from your Telegram app.')
+        otpInput?.focus()
+        return
+      }
+
+      clearMessages()
+      verifyOtpBtn.disabled = true
+      verifyOtpBtn.innerHTML = `<span class="animate-pulse">Verifying code…</span>`
+
+      try {
+        const result = await verifyTelegramOtp(code)
+
+        if (result.needs2fa) {
+          stepOtp?.classList.add('hidden')
+          step2fa?.classList.remove('hidden')
+          showInfo('Two-Step Verification (2FA) is enabled. Enter your cloud password:')
+          pass2faInput?.focus()
+          return
+        }
+
+        if (result.ok && result.user) {
+          onLoginSuccess(result.user)
+        }
+      } catch (err) {
+        console.error('Verify OTP error:', err)
+        showError(err.message || 'Invalid code. Please check and try again.')
+        showToast(err.message || 'Verification failed', 'error')
+      } finally {
+        verifyOtpBtn.disabled = false
+        verifyOtpBtn.innerHTML = `<i data-lucide="check-circle-2" style="width:16px;height:16px"></i> Verify & Log In`
+        window.lucide?.createIcons()
+      }
+    }
+
+    verifyOtpBtn?.addEventListener('click', handleVerifyOtp)
+    otpInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleVerifyOtp()
+      }
+    })
+
+    // Step 3: Verify 2FA
+    async function handleVerify2fa() {
+      const password = (pass2faInput?.value || '').trim()
+      if (!password) {
+        showError('Please enter your 2FA password.')
+        pass2faInput?.focus()
+        return
+      }
+
+      clearMessages()
+      verify2faBtn.disabled = true
+      verify2faBtn.innerHTML = `<span class="animate-pulse">Verifying password…</span>`
+
+      try {
+        const result = await verifyTelegram2faPassword(password)
+        if (result.ok && result.user) {
+          onLoginSuccess(result.user)
+        }
+      } catch (err) {
+        console.error('2FA error:', err)
+        showError(err.message || 'Incorrect 2FA password. Please try again.')
+        showToast(err.message || '2FA verification failed', 'error')
+      } finally {
+        verify2faBtn.disabled = false
+        verify2faBtn.innerHTML = `<i data-lucide="lock" style="width:16px;height:16px"></i> Confirm Password & Log In`
+        window.lucide?.createIcons()
+      }
+    }
+
+    verify2faBtn?.addEventListener('click', handleVerify2fa)
+    pass2faInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleVerify2fa()
+      }
+    })
+
+    // Back to Phone Step
+    backPhoneBtn?.addEventListener('click', () => {
+      clearMessages()
+      stepOtp?.classList.add('hidden')
+      step2fa?.classList.add('hidden')
+      stepPhone?.classList.remove('hidden')
+      phoneInput?.focus()
+    })
+
+    // Resend OTP
+    resendBtn?.addEventListener('click', () => {
+      handleSendCode()
+    })
+
+    // Custom App Credentials handlers
+    document.getElementById('btn-save-creds')?.addEventListener('click', () => {
+      const apiId = document.getElementById('custom-api-id')?.value.trim()
+      const apiHash = document.getElementById('custom-api-hash')?.value.trim()
+      if (!apiId || !apiHash) {
+        showToast('Please enter both API ID and API Hash', 'error')
+        return
+      }
+      saveApiCredentials(apiId, apiHash)
+      showToast('Custom credentials saved!', 'success')
+      location.reload()
+    })
+
+    document.getElementById('btn-reset-creds')?.addEventListener('click', () => {
+      saveApiCredentials(null, null)
+      showToast('Reset to default credentials', 'success')
+      location.reload()
+    })
+
+    function onLoginSuccess(user) {
+      setTelegramUser(user)
+
+      // Sync state profile
+      const name = user.firstName || user.first_name || 'Student'
+      state.profile.name = name
+      if (user.username) state.profile.telegramUsername = user.username
+      if (user.phone) state.profile.telegramPhone = user.phone
+      persist()
+
+      showToast(`Welcome ${name}! Connected to Telegram Saved Messages.`, 'success')
+      location.hash = '#/profile'
+      location.reload()
+    }
   } else {
-    document.getElementById('tg-logout-btn')?.addEventListener('click', () => {
-      if (confirm('Sign out from Telegram?')) {
+    // Logged in handlers
+    document.getElementById('tg-logout-btn')?.addEventListener('click', async () => {
+      if (confirm('Sign out from your Telegram account?')) {
+        await signOutTelegramUser()
         setTelegramUser(null)
-        showToast('Logged out from Telegram', 'success')
+        showToast('Signed out from Telegram', 'success')
         location.hash = '#/profile'
         location.reload()
       }

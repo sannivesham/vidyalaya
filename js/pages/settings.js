@@ -1,5 +1,6 @@
 import { state, persist } from '../store.js'
-import { getTelegramConfig, saveTelegramConfig, testTelegramConnection, isTelegramConfigured } from '../telegram-store.js'
+import { getTelegramConfig, saveTelegramConfig, testTelegramConnection, isTelegramConfigured, getTelegramUser, setTelegramUser } from '../telegram-store.js'
+import { isTelegramUserLoggedIn, signOutTelegramUser } from '../telegram-mtproto.js'
 import { showToast } from '../toast.js'
 import { escapeHtml } from '../utils.js'
 
@@ -9,7 +10,9 @@ export function render() {
   const theme = localStorage.getItem('vidyalaya-theme') || 'light'
   const accent = localStorage.getItem('vidyalaya-accent') || 'marigold'
   const tgConfig = getTelegramConfig()
+  const tgUser = getTelegramUser()
   const tgActive = isTelegramConfigured()
+  const mtprotoActive = isTelegramUserLoggedIn()
 
   return `
     <div class="max-w-xl mx-auto flex flex-col gap-6">
@@ -27,7 +30,7 @@ export function render() {
             </div>
             <div>
               <h3 class="font-display text-base font-semibold">Telegram Saved Messages Storage</h3>
-              <p class="text-[11px] text-ink/50 dark:text-paper/50">Direct upload to your Telegram chat — no channels needed</p>
+              <p class="text-[11px] text-ink/50 dark:text-paper/50">Direct upload to your personal Saved Messages vault</p>
             </div>
           </div>
           <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${tgActive ? 'bg-sage/20 text-sage-dark dark:text-sage-light' : 'bg-paper-dim dark:bg-ink-soft text-ink/50 dark:text-paper/50'}">
@@ -35,48 +38,60 @@ export function render() {
           </span>
         </div>
 
-        <form id="telegram-form" class="flex flex-col gap-4">
-          <div>
-            <label class="block text-xs font-medium mb-1.5 flex items-center justify-between">
-              <span>Bot Token <span class="text-rust">*</span></span>
-              <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="text-[11px] text-marigold-dark hover:underline flex items-center gap-1">
-                @BotFather <i data-lucide="external-link" style="width:11px;height:11px"></i>
-              </a>
-            </label>
-            <input id="tg-token" type="password" class="input font-mono text-xs" placeholder="e.g. 1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ" value="${escapeHtml(tgConfig.botToken || '')}" required />
-            <p class="text-[11px] text-ink/40 dark:text-paper/40 mt-1">From @BotFather on Telegram (send <code>/newbot</code>).</p>
+        ${mtprotoActive && tgUser ? `
+          <div class="p-4 rounded-xl bg-sage/10 border border-sage/30 text-xs mb-4">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-semibold text-sage-dark dark:text-sage-light flex items-center gap-1.5">
+                <i data-lucide="check-circle-2" style="width:14px;height:14px"></i> Telegram Account Connected
+              </span>
+              <span class="font-mono text-[11px] text-ink/60 dark:text-paper/60">${escapeHtml(tgUser.phone || tgUser.id || '')}</span>
+            </div>
+            <p class="text-ink/70 dark:text-paper/70 leading-relaxed">
+              Logged in as <strong>${escapeHtml(tgUser.firstName || tgUser.first_name || 'Student')}</strong>. All files uploaded in Library are automatically saved into your Telegram <strong>Saved Messages</strong> (chat: <code>me</code>).
+            </p>
           </div>
-
-          <div>
-            <label class="block text-xs font-medium mb-1.5 flex items-center justify-between">
-              <span>Your Telegram Username or Chat ID <span class="text-rust">*</span></span>
-              <span class="text-[11px] text-ink/40 dark:text-paper/40">e.g. @username or 123456789</span>
-            </label>
-            <input id="tg-chat" class="input font-mono text-xs" placeholder="e.g. @username or 123456789" value="${escapeHtml(tgConfig.chatId || '')}" required />
-            <p class="text-[11px] text-ink/40 dark:text-paper/40 mt-1">Uploaded documents go directly to this Telegram chat (your Saved Messages / private bot chat).</p>
+          <div class="flex items-center gap-2">
+            <a href="#/profile" class="btn btn-secondary text-xs">
+              <i data-lucide="user" style="width:14px;height:14px"></i> View Telegram Profile
+            </a>
+            <button id="btn-settings-disconnect" class="btn btn-secondary text-xs text-rust hover:border-rust">
+              Disconnect
+            </button>
           </div>
-
-          <!-- Connection test feedback -->
-          <div id="tg-test-result" class="hidden p-3 rounded-lg text-xs"></div>
-
-          <div class="flex items-center gap-2 pt-1">
-            <button type="submit" class="btn btn-primary text-xs">
-              <i data-lucide="save" style="width:14px;height:14px"></i> Save Telegram Settings
-            </button>
-            <button type="button" id="test-tg-btn" class="btn btn-secondary text-xs">
-              <i data-lucide="plug-zap" style="width:14px;height:14px"></i> Test Connection
-            </button>
-            <a href="#/profile" class="btn btn-secondary text-xs ml-auto">
-              Go to Profile <i data-lucide="arrow-right" style="width:13px;height:13px"></i>
+        ` : `
+          <div class="p-4 rounded-xl bg-paper-dim/40 dark:bg-ink-light/40 border border-paper-line dark:border-ink-soft text-xs mb-4">
+            <p class="font-semibold mb-1">Connect with Phone + Telegram OTP</p>
+            <p class="text-ink/60 dark:text-paper/60 leading-relaxed mb-3">
+              Log in with your Telegram phone number to send all study uploads directly to your Saved Messages with unlimited free storage.
+            </p>
+            <a href="#/profile" class="btn btn-primary text-xs inline-flex items-center gap-1.5">
+              <i data-lucide="log-in" style="width:14px;height:14px"></i> Log in with Telegram in Profile
             </a>
           </div>
-        </form>
-      </div>
-            <button type="button" id="test-tg-btn" class="btn btn-secondary text-xs">
-              <i data-lucide="plug-zap" style="width:14px;height:14px"></i> Test Connection
-            </button>
-          </div>
-        </form>
+
+          <!-- Advanced Bot Fallback Accordion -->
+          <details class="text-[11px] text-ink/60 dark:text-paper/60 border border-paper-line dark:border-ink-soft rounded-lg p-3">
+            <summary class="cursor-pointer font-medium hover:text-ink select-none flex items-center justify-between">
+              <span>Alternative: Connect via Telegram Bot Token (Optional)</span>
+              <i data-lucide="bot" style="width:13px;height:13px"></i>
+            </summary>
+            <form id="telegram-form" class="flex flex-col gap-3 mt-3 pt-3 border-t border-paper-line dark:border-ink-soft">
+              <div>
+                <label class="block text-xs font-medium mb-1">Bot Token</label>
+                <input id="tg-token" type="password" class="input font-mono text-xs" placeholder="1234567890:ABCdef..." value="${escapeHtml(tgConfig.botToken || '')}" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium mb-1">Chat ID or Username</label>
+                <input id="tg-chat" class="input font-mono text-xs" placeholder="@username or numeric ID" value="${escapeHtml(tgConfig.chatId || '')}" />
+              </div>
+              <div id="tg-test-result" class="hidden p-2.5 rounded-lg text-xs"></div>
+              <div class="flex items-center gap-2">
+                <button type="submit" class="btn btn-secondary text-xs">Save Bot Token</button>
+                <button type="button" id="test-tg-btn" class="btn btn-secondary text-xs">Test</button>
+              </div>
+            </form>
+          </details>
+        `}
       </div>
 
       <!-- Profile -->
@@ -121,20 +136,30 @@ export function render() {
 export function mount() {
   window.lucide?.createIcons()
 
-  // Telegram settings save
+  // Disconnect Telegram MTProto button
+  document.getElementById('btn-settings-disconnect')?.addEventListener('click', async () => {
+    if (confirm('Disconnect Telegram account?')) {
+      await signOutTelegramUser()
+      setTelegramUser(null)
+      showToast('Telegram account disconnected', 'success')
+      location.reload()
+    }
+  })
+
+  // Telegram bot settings save (if accordion is used)
   document.getElementById('telegram-form')?.addEventListener('submit', (e) => {
     e.preventDefault()
-    const botToken = document.getElementById('tg-token').value.trim()
-    const chatId = document.getElementById('tg-chat').value.trim()
+    const botToken = document.getElementById('tg-token')?.value.trim() || ''
+    const chatId = document.getElementById('tg-chat')?.value.trim() || ''
 
     saveTelegramConfig({ botToken, chatId, enabled: true })
-    showToast('Telegram storage settings saved!', 'success')
+    showToast('Telegram bot settings saved!', 'success')
   })
 
   // Test connection button
   document.getElementById('test-tg-btn')?.addEventListener('click', async () => {
-    const botToken = document.getElementById('tg-token').value.trim()
-    const chatId = document.getElementById('tg-chat').value.trim()
+    const botToken = document.getElementById('tg-token')?.value.trim()
+    const chatId = document.getElementById('tg-chat')?.value.trim()
     const resultEl = document.getElementById('tg-test-result')
     const testBtn = document.getElementById('test-tg-btn')
 

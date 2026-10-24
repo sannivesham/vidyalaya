@@ -1,4 +1,7 @@
 const TELEGRAM_CONFIG_KEY = 'vidyalaya-telegram-config'
+const TELEGRAM_USER_KEY = 'vidyalaya-telegram-user'
+
+let authListeners = []
 
 /**
  * Retrieves the stored Telegram configuration.
@@ -14,7 +17,7 @@ export function getTelegramConfig() {
 }
 
 /**
- * Saves the Telegram configuration to localStorage.
+ * Saves the Telegram configuration.
  */
 export function saveTelegramConfig(config) {
   const current = getTelegramConfig()
@@ -24,47 +27,104 @@ export function saveTelegramConfig(config) {
 }
 
 /**
- * Checks whether Telegram storage is properly configured.
+ * Retrieves the currently logged-in Telegram user.
+ * { id, first_name, last_name, username, photo_url, botToken, auth_date }
  */
-export function isTelegramConfigured() {
-  const config = getTelegramConfig()
-  return Boolean(config && config.botToken && config.botToken.trim() && config.chatId && config.chatId.trim() && config.enabled !== false)
+export function getTelegramUser() {
+  try {
+    const raw = localStorage.getItem(TELEGRAM_USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
 
 /**
- * Tests connection to Telegram using the provided bot token and optional chat ID.
+ * Saves or clears the logged-in Telegram user.
+ */
+export function setTelegramUser(user) {
+  if (!user) {
+    localStorage.removeItem(TELEGRAM_USER_KEY)
+  } else {
+    localStorage.setItem(TELEGRAM_USER_KEY, JSON.stringify(user))
+  }
+  notifyAuthListeners(user)
+}
+
+export function isTelegramLoggedIn() {
+  const user = getTelegramUser()
+  return Boolean(user && (user.id || user.username))
+}
+
+export function onTelegramAuthChange(callback) {
+  authListeners.push(callback)
+  return () => {
+    authListeners = authListeners.filter((cb) => cb !== callback)
+  }
+}
+
+function notifyAuthListeners(user) {
+  authListeners.forEach((cb) => {
+    try { cb(user) } catch (err) { console.warn(err) }
+  })
+}
+
+/**
+ * Returns true if Telegram is available (either logged in or configured).
+ */
+export function isTelegramConfigured() {
+  const user = getTelegramUser()
+  const config = getTelegramConfig()
+  const hasToken = Boolean((user && user.botToken) || (config && config.botToken))
+  const hasDestination = Boolean((user && (user.id || user.username)) || (config && config.chatId))
+  return hasToken && hasDestination
+}
+
+/**
+ * Gets effective Bot Token and Target Chat ID (user's Saved Messages / private chat).
+ */
+export function getActiveTelegramCredentials() {
+  const user = getTelegramUser()
+  const config = getTelegramConfig()
+
+  const botToken = (user?.botToken || config?.botToken || '').trim()
+  const chatId = (user?.id || user?.username || config?.chatId || '').trim()
+
+  return { botToken, chatId, user }
+}
+
+/**
+ * Tests connection to Telegram using bot token and chat target.
  */
 export async function testTelegramConnection(botToken, chatId) {
   const token = (botToken || '').trim()
   const chat = (chatId || '').trim()
 
   if (!token) {
-    throw new Error('Please enter a Telegram Bot Token.')
+    throw new Error('Please enter your Telegram Bot Token.')
   }
 
-  // 1. Verify Bot Token via getMe
+  // 1. Verify Bot Token
   const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`)
   const meData = await meRes.json()
 
   if (!meData.ok) {
-    throw new Error(meData.description || 'Invalid Bot Token. Please check your token from @BotFather.')
+    throw new Error(meData.description || 'Invalid Bot Token. Check your token from @BotFather.')
   }
 
   const botInfo = meData.result
-
-  // 2. If chatId provided, test chat access
   let chatInfo = null
+
+  // 2. If chat/user target is provided, verify
   if (chat) {
     try {
       const chatRes = await fetch(`https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(chat)}`)
       const chatData = await chatRes.json()
       if (chatData.ok) {
         chatInfo = chatData.result
-      } else {
-        throw new Error(`Chat verification failed: ${chatData.description}. Make sure your bot is added to this group/channel.`)
       }
-    } catch (err) {
-      throw new Error(err.message || 'Could not verify Chat ID.')
+    } catch {
+      // Ignored for privacy-restricted direct user IDs before user sends /start
     }
   }
 
@@ -76,29 +136,33 @@ export async function testTelegramConnection(botToken, chatId) {
 }
 
 /**
- * Uploads a file Blob to Telegram as a document.
- * Returns the Telegram file_id, file_name, file_size, etc.
+ * Uploads a file directly to the user's Telegram (Saved Messages / private chat).
  */
 export async function uploadFileToTelegram(blob, fileName, caption = '') {
-  const config = getTelegramConfig()
-  if (!config.botToken || !config.chatId) {
-    throw new Error('Telegram Bot Token and Chat ID must be configured in Settings.')
+  const { botToken, chatId } = getActiveTelegramCredentials()
+
+  if (!botToken || !chatId) {
+    throw new Error('Please log in with Telegram in your Profile to send uploads to Saved Messages.')
   }
 
   const formData = new FormData()
-  formData.append('chat_id', config.chatId.trim())
+  formData.append('chat_id', chatId)
   formData.append('document', blob, fileName)
   if (caption) {
     formData.append('caption', caption.slice(0, 1000))
   }
 
-  const res = await fetch(`https://api.telegram.org/bot${config.botToken.trim()}/sendDocument`, {
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
     method: 'POST',
     body: formData,
   })
 
   const data = await res.json()
   if (!data.ok) {
+    // If user hasn't messaged the bot yet
+    if (data.description && data.description.includes('chat not found')) {
+      throw new Error(`Please open your Telegram and press "Start" on your bot once so it has permission to send you files.`)
+    }
     throw new Error(data.description || 'Telegram upload failed.')
   }
 
@@ -115,17 +179,14 @@ export async function uploadFileToTelegram(blob, fileName, caption = '') {
 
 /**
  * Downloads a file from Telegram by file_id.
- * 1. Calls getFile to receive the file_path.
- * 2. Fetches the raw file bytes from https://api.telegram.org/file/bot<token>/<file_path>.
  */
 export async function downloadFileFromTelegram(telegramFileId) {
-  const config = getTelegramConfig()
-  if (!config.botToken) {
-    throw new Error('Telegram Bot Token not configured.')
+  const { botToken } = getActiveTelegramCredentials()
+  if (!botToken) {
+    throw new Error('Telegram Bot Token not available.')
   }
 
-  // Step 1: get file path
-  const metaRes = await fetch(`https://api.telegram.org/bot${config.botToken.trim()}/getFile?file_id=${encodeURIComponent(telegramFileId)}`)
+  const metaRes = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(telegramFileId)}`)
   const metaData = await metaRes.json()
 
   if (!metaData.ok || !metaData.result?.file_path) {
@@ -133,9 +194,8 @@ export async function downloadFileFromTelegram(telegramFileId) {
   }
 
   const filePath = metaData.result.file_path
-  const downloadUrl = `https://api.telegram.org/file/bot${config.botToken.trim()}/${filePath}`
+  const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`
 
-  // Step 2: fetch binary
   const fileRes = await fetch(downloadUrl)
   if (!fileRes.ok) {
     throw new Error(`Failed to download file from Telegram (${fileRes.status})`)

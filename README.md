@@ -24,10 +24,9 @@ There is **no build step, no npm build, no node_modules required** — it runs d
    - Visual progress countdown, start/pause/reset controls, and optional Web Audio chime.
    - Automatically tracks your focus minutes, updates your streak, and increments daily goals.
 
-4. **Telegram Cloud Storage**:
-   - Store and sync your study materials for free via the Telegram Bot API.
-   - Enter your Bot Token (from `@BotFather`) and Channel/Group Chat ID in **Settings**.
-   - Built-in connection tester to verify bot and channel connectivity.
+4. **Telegram Saved Messages Storage**:
+   - Log in with Telegram in **Profile**.
+   - No channels or groups required — any document you upload is delivered directly to your **personal Telegram Saved Messages / chat**.
    - Files are also cached locally in browser **IndexedDB** for instant offline opening.
 
 ---
@@ -58,17 +57,15 @@ Or use any static web server (VS Code Live Server, Python, GitHub Pages, etc.).
 
 ---
 
-## Telegram Cloud Storage Setup
+## Telegram Saved Messages Setup (Zero Hassle)
 
 1. Open Telegram and search for `@BotFather`.
-2. Send `/newbot`, name your bot (e.g., `MyStudyBot`), and copy the **Bot Token**.
-3. Create a Telegram Channel or Group (e.g. `My Study Vault`).
-4. Add your bot as an **Administrator** to that channel.
-5. In Vidyalaya, go to **Settings &rarr; Telegram Cloud Storage**:
+2. Send `/newbot`, give it a name, and copy the **Bot Token**.
+3. In Vidyalaya, go to **Profile**:
    - Paste your **Bot Token**.
-   - Paste your **Chat ID** or channel username (e.g. `@my_study_vault` or `-100xxxxxxxxxx`).
-   - Click **Test Connection** &rarr; **Save Telegram Settings**.
-6. When you upload files in the Library, they will be sent straight to your Telegram channel and available from any browser!
+   - Enter your Telegram **@username** or user ID.
+   - Click **Connect & Log in with Telegram**.
+4. That's it! When you upload files in any subject folder, they are sent directly to your Telegram chat (Saved Messages) and saved in your local library. No channels, groups, or channel IDs needed!
 
 ---
 

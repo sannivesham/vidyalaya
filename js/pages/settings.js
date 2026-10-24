@@ -26,12 +26,12 @@ export function render() {
               <i data-lucide="send" style="width:20px;height:20px"></i>
             </div>
             <div>
-              <h3 class="font-display text-base font-semibold">Telegram Cloud Storage</h3>
-              <p class="text-[11px] text-ink/50 dark:text-paper/50">Unlimited, free cloud storage for your study files</p>
+              <h3 class="font-display text-base font-semibold">Telegram Saved Messages Storage</h3>
+              <p class="text-[11px] text-ink/50 dark:text-paper/50">Direct upload to your Telegram chat — no channels needed</p>
             </div>
           </div>
           <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${tgActive ? 'bg-sage/20 text-sage-dark dark:text-sage-light' : 'bg-paper-dim dark:bg-ink-soft text-ink/50 dark:text-paper/50'}">
-            ${tgActive ? 'Connected' : 'Not Connected'}
+            ${tgActive ? 'Active' : 'Not Connected'}
           </span>
         </div>
 
@@ -40,20 +40,20 @@ export function render() {
             <label class="block text-xs font-medium mb-1.5 flex items-center justify-between">
               <span>Bot Token <span class="text-rust">*</span></span>
               <a href="https://t.me/BotFather" target="_blank" rel="noopener" class="text-[11px] text-marigold-dark hover:underline flex items-center gap-1">
-                Get from @BotFather <i data-lucide="external-link" style="width:11px;height:11px"></i>
+                @BotFather <i data-lucide="external-link" style="width:11px;height:11px"></i>
               </a>
             </label>
             <input id="tg-token" type="password" class="input font-mono text-xs" placeholder="e.g. 1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ" value="${escapeHtml(tgConfig.botToken || '')}" required />
-            <p class="text-[11px] text-ink/40 dark:text-paper/40 mt-1">Open Telegram, message <strong>@BotFather</strong>, send <code>/newbot</code>, and paste the token.</p>
+            <p class="text-[11px] text-ink/40 dark:text-paper/40 mt-1">From @BotFather on Telegram (send <code>/newbot</code>).</p>
           </div>
 
           <div>
             <label class="block text-xs font-medium mb-1.5 flex items-center justify-between">
-              <span>Chat ID / Channel Username <span class="text-rust">*</span></span>
-              <span class="text-[11px] text-ink/40 dark:text-paper/40">e.g. @MyChannel or -100xxxxxxxxxx</span>
+              <span>Your Telegram Username or Chat ID <span class="text-rust">*</span></span>
+              <span class="text-[11px] text-ink/40 dark:text-paper/40">e.g. @username or 123456789</span>
             </label>
-            <input id="tg-chat" class="input font-mono text-xs" placeholder="e.g. @my_study_vault or -1001234567890" value="${escapeHtml(tgConfig.chatId || '')}" required />
-            <p class="text-[11px] text-ink/40 dark:text-paper/40 mt-1">Create a channel/group on Telegram, add your bot as Admin, and enter the channel username or chat ID.</p>
+            <input id="tg-chat" class="input font-mono text-xs" placeholder="e.g. @username or 123456789" value="${escapeHtml(tgConfig.chatId || '')}" required />
+            <p class="text-[11px] text-ink/40 dark:text-paper/40 mt-1">Uploaded documents go directly to this Telegram chat (your Saved Messages / private bot chat).</p>
           </div>
 
           <!-- Connection test feedback -->
@@ -63,6 +63,15 @@ export function render() {
             <button type="submit" class="btn btn-primary text-xs">
               <i data-lucide="save" style="width:14px;height:14px"></i> Save Telegram Settings
             </button>
+            <button type="button" id="test-tg-btn" class="btn btn-secondary text-xs">
+              <i data-lucide="plug-zap" style="width:14px;height:14px"></i> Test Connection
+            </button>
+            <a href="#/profile" class="btn btn-secondary text-xs ml-auto">
+              Go to Profile <i data-lucide="arrow-right" style="width:13px;height:13px"></i>
+            </a>
+          </div>
+        </form>
+      </div>
             <button type="button" id="test-tg-btn" class="btn btn-secondary text-xs">
               <i data-lucide="plug-zap" style="width:14px;height:14px"></i> Test Connection
             </button>

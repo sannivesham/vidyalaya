@@ -1,3 +1,5 @@
+import { getTelegramUser } from './telegram-store.js'
+
 const NAV = [
   { to: '#/', label: 'Dashboard', icon: 'layout-dashboard' },
   { to: '#/library', label: 'Library', icon: 'library' },
@@ -22,6 +24,8 @@ function icon(name, size = 17) {
 }
 
 export function renderShell(currentHash) {
+  const tgUser = getTelegramUser()
+
   const sidebarLinks = NAV.map(({ to, label, icon: ic }) => `
     <a href="${to}" class="nav-link ${currentHash === to ? 'active' : ''}">
       ${icon(ic)} ${label}
@@ -36,7 +40,7 @@ export function renderShell(currentHash) {
     <div class="min-h-screen flex">
       <aside class="hidden md:flex flex-col w-60 shrink-0 border-r border-paper-line dark:border-ink-soft px-4 py-6">
         <div class="flex items-center gap-2 px-2 mb-8">
-          <div class="w-8 h-8 rounded-md bg-ink dark:bg-paper flex items-center justify-center">
+          <div class="w-8 h-8 rounded-md bg-ink dark:bg-paper flex items-center justify-center text-paper dark:text-ink">
             ${icon('book-open', 16)}
           </div>
           <span class="font-display text-lg font-semibold tracking-tight">Vidyalaya</span>
@@ -52,8 +56,10 @@ export function renderShell(currentHash) {
             <button id="theme-toggle" class="p-2 rounded-lg hover:bg-ink/5 dark:hover:bg-paper/10" aria-label="Toggle theme">
               ${icon('moon')}
             </button>
-            <a href="#/profile" class="w-8 h-8 rounded-full bg-marigold/20 flex items-center justify-center hover:bg-marigold/30" aria-label="Profile">
-              ${icon('user', 15)}
+            <a href="#/profile" class="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-paper-line dark:border-ink-soft hover:bg-ink/5 dark:hover:bg-paper/10 text-xs" aria-label="Profile">
+              <span class="w-2 h-2 rounded-full ${tgUser ? 'bg-sage animate-pulse' : 'bg-marigold'}"></span>
+              <span class="font-medium">${tgUser ? (tgUser.first_name || tgUser.username || 'Telegram') : 'Login'}</span>
+              <i data-lucide="send" style="width:12px;height:12px" class="text-blue-500"></i>
             </a>
           </div>
         </header>

@@ -76,11 +76,11 @@ export function render(params) {
           <i data-lucide="${telegramActive ? 'cloud-check' : 'hard-drive'}" class="${telegramActive ? 'text-sage' : 'text-marigold-dark'}" style="width:16px;height:16px"></i>
           <span>
             ${telegramActive
-              ? `<strong>Telegram Cloud Storage</strong> active — files safely backed up to your Telegram channel.`
-              : `<strong>Local Storage Active</strong> — files saved in browser. <a href="#/settings" class="text-marigold-dark font-medium underline">Configure Telegram in Settings</a> to enable cloud sync.`}
+              ? `<strong>Telegram Saved Messages Active</strong> — files upload directly to your Telegram chat.`
+              : `<strong>Local Storage Active</strong> — <a href="#/profile" class="text-marigold-dark font-medium underline">Log in with Telegram</a> to send uploads directly to your Saved Messages.`}
           </span>
         </div>
-        <a href="#/settings" class="text-[11px] font-medium text-ink/60 dark:text-paper/60 hover:text-marigold-dark shrink-0">Storage Settings &rarr;</a>
+        <a href="#/profile" class="text-[11px] font-medium text-ink/60 dark:text-paper/60 hover:text-marigold-dark shrink-0">Telegram Profile &rarr;</a>
       </div>
 
       <!-- Search and navigation tabs -->
@@ -598,12 +598,12 @@ function openUploadModal(preselectedFolderId = null) {
           <div class="p-3 rounded-lg border text-xs ${telegramReady ? 'border-sage/40 bg-sage/10 text-sage-dark dark:text-sage-light' : 'border-marigold/40 bg-marigold/10 text-ink/70 dark:text-paper/70'}">
             <div class="flex items-center gap-1.5 font-semibold">
               <i data-lucide="${telegramReady ? 'check-circle' : 'info'}" style="width:14px;height:14px"></i>
-              <span>${telegramReady ? 'Telegram Cloud Storage Enabled' : 'Local Storage Mode'}</span>
+              <span>${telegramReady ? 'Telegram Saved Messages Vault Connected' : 'Local Storage Mode'}</span>
             </div>
             <p class="text-[11px] mt-0.5 opacity-80">
               ${telegramReady
-                ? 'Your file will be uploaded to your Telegram channel and cached in browser.'
-                : 'File will be saved locally. You can connect your Telegram bot in Settings for cloud sync.'}
+                ? 'Your file will be sent directly to your Telegram Saved Messages / chat and cached in your browser.'
+                : 'File will be saved locally. <a href="#/profile" class="underline font-semibold">Log in with Telegram</a> in Profile to auto-save to Telegram.'}
             </p>
           </div>
 
